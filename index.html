@@ -95,10 +95,9 @@
     <div class="dot"></div>
     <div class="dot"></div>
   </div>
-
   <script>
     const LIFF_ID = "2009932145-FwlmUmzy";
-    const WEBHOOK_URL = "const WEBHOOK_URL = "https://n8nb.workproservice.org/webhook/true-liff";
+    const WEBHOOK_URL = "https://n8nb.workproservice.org/webhook/true-liff";
 
     async function main() {
       const currentParams = new URLSearchParams(window.location.search);
@@ -164,10 +163,14 @@
         console.error("Webhook error:", e);
       }
 
-      liff.openWindow({
-        url: "https://line.me/R/ti/p/@clubtrue",
-        external: false
-      });
+      if (liff.isInClient()) {
+        liff.openWindow({
+          url: "https://line.me/R/ti/p/@clubtrue",
+          external: false
+        });
+      } else {
+        window.location.href = "https://line.me/R/ti/p/@clubtrue";
+      }
     }
 
     main().catch(console.error);
