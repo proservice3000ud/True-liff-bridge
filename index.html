@@ -77,8 +77,8 @@
   </style>
 </head>
 <body>
-  <img class="logo-img" 
-       src="https://raw.githubusercontent.com/proservice3000ud/True-liff-bridge/main/Trueonline-logo.svg.png" 
+  <img class="logo-img"
+       src="https://raw.githubusercontent.com/proservice3000ud/True-liff-bridge/main/Trueonline-logo.svg.png"
        alt="True Online">
   <div class="line-badge">
     <div class="line-icon">
@@ -96,7 +96,7 @@
   </div>
 
   <script>
-    const LIFF_ID = "YOUR_LIFF_ID"; // ใส่ทีหลัง
+    const LIFF_ID = "2009932145-FwlmUmzy";
     const WEBHOOK_URL = "https://n8nb.workproservice.org/webhook/true-liff";
 
     async function main() {
@@ -106,7 +106,7 @@
       const campaign  = currentParams.get("utm_campaign") || "";
       const channel   = currentParams.get("channel")      || "Direct";
 
-      await liff.init({ 
+      await liff.init({
         liffId: LIFF_ID,
         withLoginOnExternalBrowser: true
       });
