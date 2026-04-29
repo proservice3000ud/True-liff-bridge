@@ -19,6 +19,12 @@
       color: white;
       padding: 20px;
     }
+    .logo-img {
+      width: 80%;
+      max-width: 300px;
+      margin-bottom: 24px;
+      border-radius: 16px;
+    }
     .line-badge {
       display: flex;
       align-items: center;
@@ -71,6 +77,9 @@
   </style>
 </head>
 <body>
+  <img class="logo-img" 
+       src="https://raw.githubusercontent.com/proservice3000ud/True-liff-bridge/main/Trueonline-logo.svg.png" 
+       alt="True Online">
   <div class="line-badge">
     <div class="line-icon">
       <svg viewBox="0 0 24 24" fill="#06C755">
@@ -125,8 +134,8 @@
         } catch(e) {}
       }
 
-      const profile = await liff.getProfile();
-      const device  = /Mobi|Android/i.test(navigator.userAgent) ? "มือถือ" : "คอมพิวเตอร์";
+      const profile   = await liff.getProfile();
+      const device    = /Mobi|Android/i.test(navigator.userAgent) ? "มือถือ" : "คอมพิวเตอร์";
       const timestamp = new Date().toLocaleString("th-TH", { timeZone: "Asia/Bangkok" });
 
       const data = {
