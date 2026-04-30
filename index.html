@@ -105,6 +105,7 @@
       const matchtype = currentParams.get("matchtype")    || "";
       const campaign  = currentParams.get("utm_campaign") || "";
       const channel   = currentParams.get("channel")      || "Direct";
+      const action    = currentParams.get("action")       || "";
 
       await liff.init({
         liffId: LIFF_ID,
@@ -116,13 +117,14 @@
           "kw=" + encodeURIComponent(keyword) +
           "&mt=" + encodeURIComponent(matchtype) +
           "&cp=" + encodeURIComponent(campaign) +
-          "&ch=" + encodeURIComponent(channel)
+          "&ch=" + encodeURIComponent(channel) +
+          "&ac=" + encodeURIComponent(action)
         );
         liff.login({ redirectUri: window.location.origin + window.location.pathname + "?liff.state=" + state });
         return;
       }
 
-      let kw = keyword, mt = matchtype, cp = campaign, ch = channel;
+      let kw = keyword, mt = matchtype, cp = campaign, ch = channel, ac = action;
       const liffState = currentParams.get("liff.state");
       if (liffState) {
         try {
@@ -131,6 +133,7 @@
           mt = stateParams.get("mt") || mt;
           cp = stateParams.get("cp") || cp;
           ch = stateParams.get("ch") || ch;
+          ac = stateParams.get("ac") || ac;
         } catch(e) {}
       }
 
@@ -146,7 +149,8 @@
         utm_source:   ch,
         utm_campaign: cp,
         device:       device,
-        timestamp:    timestamp
+        timestamp:    timestamp,
+        action:       ac
       };
 
       const blob = new Blob([JSON.stringify(data)], { type: "application/json" });
