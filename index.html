@@ -102,7 +102,6 @@
     async function main() {
       const currentParams = new URLSearchParams(window.location.search);
 
-      // อ่าน liff.state ก่อน init
       const liffState = currentParams.get("liff.state");
       let kw = '', mt = '', cp = '', ch = '', ac = '';
 
@@ -114,12 +113,9 @@
           cp = stateParams.get("cp") || '';
           ch = stateParams.get("ch") || '';
           ac = stateParams.get("ac") || '';
-        } catch(e) {
-          console.error("liffState parse error:", e);
-        }
+        } catch(e) {}
       }
 
-      // ถ้าไม่มีจาก liff.state ให้ดึงจาก URL params ปกติ
       if (!kw) kw = currentParams.get("keyword")      || '';
       if (!mt) mt = currentParams.get("matchtype")    || '';
       if (!cp) cp = currentParams.get("utm_campaign") || '';
@@ -149,14 +145,12 @@
         return;
       }
 
-      // ถ้ายังไม่มีค่า ให้ดึงจาก sessionStorage
       if (!ac) ac = sessionStorage.getItem('liff_action')    || '';
       if (!kw) kw = sessionStorage.getItem('liff_keyword')   || '';
       if (!mt) mt = sessionStorage.getItem('liff_matchtype') || '';
       if (!cp) cp = sessionStorage.getItem('liff_campaign')  || '';
       if (!ch) ch = sessionStorage.getItem('liff_channel')   || '';
 
-      // ล้าง sessionStorage
       sessionStorage.removeItem('liff_action');
       sessionStorage.removeItem('liff_keyword');
       sessionStorage.removeItem('liff_matchtype');
@@ -179,22 +173,9 @@
         action:       ac
       };
 
-      // ส่งด้วย sendBeacon ก่อน
-      const blob = new Blob([JSON.stringify(data)], { type: "application/json" });
+      // ส่งด้วย sendBeacon (text/plain ไม่มี CORS preflight)
+      const blob = new Blob([JSON.stringify(data)], { type: "text/plain" });
       navigator.sendBeacon(WEBHOOK_URL, blob);
-
-      // ส่งสำรองด้วย fetch + no-cors
-      try {
-        await fetch(WEBHOOK_URL, {
-          method: "POST",
-          mode: "no-cors",
-          headers: { "Content-Type": "application/json" },
-          keepalive: true,
-          body: JSON.stringify(data)
-        });
-      } catch(e) {
-        console.error("Webhook error:", e);
-      }
 
       if (liff.isInClient()) {
         liff.openWindow({
