@@ -88,17 +88,14 @@
       
       let kw = '', mt = '', cp = '', ch = '', ac = '', gclid = '';
 
-      // 1) อ่านจาก liff.state ก่อน (รองรับทั้ง full key และ short key)
       if (liffState) {
         try {
           let stateString = decodeURIComponent(liffState);
-          // 🔧 FIX: lop "?" ออกถ้ามี (LINE บางครั้งใส่อัตโนมัติ)
           if (stateString.startsWith('?')) {
             stateString = stateString.substring(1);
           }
           
           const stateParams = new URLSearchParams(stateString);
-          // รองรับทั้ง full key และ short key
           kw = stateParams.get("keyword") || stateParams.get("kw") || '';
           mt = stateParams.get("matchtype") || stateParams.get("mt") || '';
           cp = stateParams.get("utm_campaign") || stateParams.get("cp") || '';
@@ -108,7 +105,6 @@
         } catch(e) {}
       }
 
-      // 2) อ่านจาก URL ปัจจุบัน
       if (!ch) ch = currentParams.get("channel") || '';
       if (!kw) kw = currentParams.get("keyword") || '';
       if (!mt) mt = currentParams.get("matchtype") || '';
@@ -116,7 +112,6 @@
       if (!ac) ac = currentParams.get("action") || '';
       if (!gclid) gclid = currentParams.get("gclid") || '';
 
-      // 3) Fallback ไป sessionStorage
       if (!ch) {
         ac = ac || sessionStorage.getItem('liff_action') || '';
         kw = kw || sessionStorage.getItem('liff_keyword') || '';
@@ -131,7 +126,6 @@
         withLoginOnExternalBrowser: true
       });
 
-      // 4) ถ้ายังไม่ login → save แล้ว redirect ไป login
       if (!liff.isLoggedIn()) {
         sessionStorage.setItem('liff_action', ac);
         sessionStorage.setItem('liff_keyword', kw);
@@ -146,7 +140,6 @@
         return;
       }
 
-      // 5) Login แล้ว → clear storage
       sessionStorage.removeItem('liff_action');
       sessionStorage.removeItem('liff_keyword');
       sessionStorage.removeItem('liff_matchtype');
@@ -154,10 +147,7 @@
       sessionStorage.removeItem('liff_channel');
       sessionStorage.removeItem('liff_gclid');
 
-      // 6) ตรวจสอบ — ถ้าทุกค่าว่าง ไม่ส่ง webhook (กัน duplicate)
       if (!ch && !kw && !ac) {
-        console.log('No data to send, skipping webhook');
-        // ยังคง redirect ไป LINE OA
         if (liff.isInClient()) {
           liff.openWindow({ url: "https://line.me/R/ti/p/@clubtrue", external: false });
         } else {
@@ -166,7 +156,6 @@
         return;
       }
 
-      // 7) ส่งข้อมูลไป webhook
       const profile = await liff.getProfile();
       const device = /Mobi|Android/i.test(navigator.userAgent) ? "มือถือ" : "คอมพิวเตอร์";
       const timestamp = new Date().toLocaleString("th-TH", { timeZone: "Asia/Bangkok" });
@@ -194,11 +183,8 @@
           keepalive: true,
           body: JSON.stringify(data)
         });
-      } catch(e) {
-        console.error("Webhook error:", e);
-      }
+      } catch(e) {}
 
-      // 8) Redirect ไป LINE OA
       if (liff.isInClient()) {
         liff.openWindow({
           url: "https://line.me/R/ti/p/@clubtrue",
