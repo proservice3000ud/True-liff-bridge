@@ -43,31 +43,14 @@
       align-items: center;
       justify-content: center;
     }
-    .line-icon svg {
-      width: 24px;
-      height: 24px;
-    }
-    .line-text {
-      font-size: 16px;
-      font-weight: 600;
-      color: #222222;
-    }
-    .status-text {
-      font-size: 14px;
-      color: #555555;
-      margin-bottom: 24px;
-    }
-    .dots {
-      display: flex;
-      gap: 8px;
-    }
+    .line-icon svg { width: 24px; height: 24px; }
+    .line-text { font-size: 16px; font-weight: 600; color: #222222; }
+    .status-text { font-size: 14px; color: #555555; margin-bottom: 24px; }
+    .dots { display: flex; gap: 8px; }
     .dot {
-      width: 10px;
-      height: 10px;
-      background: #222222;
-      border-radius: 50%;
-      opacity: 0.3;
-      animation: pulse 1.2s infinite;
+      width: 10px; height: 10px;
+      background: #222222; border-radius: 50%;
+      opacity: 0.3; animation: pulse 1.2s infinite;
     }
     .dot:nth-child(2) { animation-delay: 0.2s; }
     .dot:nth-child(3) { animation-delay: 0.4s; }
@@ -103,24 +86,33 @@
       const currentParams = new URLSearchParams(window.location.search);
 
       const liffState = currentParams.get("liff.state");
-      let kw = '', mt = '', cp = '', ch = '', ac = '';
+      let kw = '', mt = '', cp = '', ch = '', ac = '', ref = '';
 
       if (liffState) {
         try {
           const stateParams = new URLSearchParams(decodeURIComponent(liffState));
-          kw = stateParams.get("kw") || '';
-          mt = stateParams.get("mt") || '';
-          cp = stateParams.get("cp") || '';
-          ch = stateParams.get("ch") || '';
-          ac = stateParams.get("ac") || '';
+          kw  = stateParams.get("kw")  || '';
+          mt  = stateParams.get("mt")  || '';
+          cp  = stateParams.get("cp")  || '';
+          ch  = stateParams.get("ch")  || '';
+          ac  = stateParams.get("ac")  || '';
+          ref = stateParams.get("ref") || '';
         } catch(e) {}
       }
 
-      if (!kw) kw = currentParams.get("keyword")      || '';
-      if (!mt) mt = currentParams.get("matchtype")    || '';
-      if (!cp) cp = currentParams.get("utm_campaign") || '';
-      if (!ch) ch = currentParams.get("channel")      || '';
-      if (!ac) ac = currentParams.get("action")       || '';
+      if (!kw)  kw  = currentParams.get("keyword")      || '';
+      if (!mt)  mt  = currentParams.get("matchtype")    || '';
+      if (!cp)  cp  = currentParams.get("utm_campaign") || '';
+      if (!ch)  ch  = currentParams.get("channel")      || '';
+      if (!ac)  ac  = currentParams.get("action")       || '';
+      if (!ref) ref = currentParams.get("ref")          || '';
+
+      // ถ้ายังไม่มี channel ให้ดึงจาก ref
+      if (!ch) {
+        if (ref.includes('google')) ch = 'SEO';
+        else if (ref.includes('facebook') || ref.includes('fb.com')) ch = 'Facebook';
+        else if (ref) ch = 'Direct';
+      }
 
       await liff.init({
         liffId: LIFF_ID,
@@ -133,29 +125,40 @@
         sessionStorage.setItem('liff_matchtype', mt);
         sessionStorage.setItem('liff_campaign',  cp);
         sessionStorage.setItem('liff_channel',   ch);
+        sessionStorage.setItem('liff_ref',       ref);
 
         const state = encodeURIComponent(
-          "kw=" + encodeURIComponent(kw) +
-          "&mt=" + encodeURIComponent(mt) +
-          "&cp=" + encodeURIComponent(cp) +
-          "&ch=" + encodeURIComponent(ch) +
-          "&ac=" + encodeURIComponent(ac)
+          "kw="  + encodeURIComponent(kw)  +
+          "&mt=" + encodeURIComponent(mt)  +
+          "&cp=" + encodeURIComponent(cp)  +
+          "&ch=" + encodeURIComponent(ch)  +
+          "&ac=" + encodeURIComponent(ac)  +
+          "&ref="+ encodeURIComponent(ref)
         );
         liff.login({ redirectUri: window.location.origin + window.location.pathname + "?liff.state=" + state });
         return;
       }
 
-      if (!ac) ac = sessionStorage.getItem('liff_action')    || '';
-      if (!kw) kw = sessionStorage.getItem('liff_keyword')   || '';
-      if (!mt) mt = sessionStorage.getItem('liff_matchtype') || '';
-      if (!cp) cp = sessionStorage.getItem('liff_campaign')  || '';
-      if (!ch) ch = sessionStorage.getItem('liff_channel')   || '';
+      if (!ac)  ac  = sessionStorage.getItem('liff_action')    || '';
+      if (!kw)  kw  = sessionStorage.getItem('liff_keyword')   || '';
+      if (!mt)  mt  = sessionStorage.getItem('liff_matchtype') || '';
+      if (!cp)  cp  = sessionStorage.getItem('liff_campaign')  || '';
+      if (!ch)  ch  = sessionStorage.getItem('liff_channel')   || '';
+      if (!ref) ref = sessionStorage.getItem('liff_ref')       || '';
+
+      // ถ้ายังไม่มี channel ให้ดึงจาก ref
+      if (!ch) {
+        if (ref.includes('google')) ch = 'SEO';
+        else if (ref.includes('facebook') || ref.includes('fb.com')) ch = 'Facebook';
+        else if (ref) ch = 'Direct';
+      }
 
       sessionStorage.removeItem('liff_action');
       sessionStorage.removeItem('liff_keyword');
       sessionStorage.removeItem('liff_matchtype');
       sessionStorage.removeItem('liff_campaign');
       sessionStorage.removeItem('liff_channel');
+      sessionStorage.removeItem('liff_ref');
 
       const profile   = await liff.getProfile();
       const device    = /Mobi|Android/i.test(navigator.userAgent) ? "มือถือ" : "คอมพิวเตอร์";
@@ -173,9 +176,20 @@
         action:       ac
       };
 
-      // ส่งด้วย sendBeacon (text/plain ไม่มี CORS preflight)
       const blob = new Blob([JSON.stringify(data)], { type: "text/plain" });
       navigator.sendBeacon(WEBHOOK_URL, blob);
+
+      try {
+        await fetch(WEBHOOK_URL, {
+          method: "POST",
+          mode: "no-cors",
+          headers: { "Content-Type": "application/json" },
+          keepalive: true,
+          body: JSON.stringify(data)
+        });
+      } catch(e) {
+        console.error("Webhook error:", e);
+      }
 
       if (liff.isInClient()) {
         liff.openWindow({
