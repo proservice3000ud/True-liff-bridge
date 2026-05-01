@@ -101,11 +101,28 @@
 
     async function main() {
       const currentParams = new URLSearchParams(window.location.search);
-      const keyword   = currentParams.get("keyword")      || "";
-      const matchtype = currentParams.get("matchtype")    || "";
-      const campaign  = currentParams.get("utm_campaign") || "";
-      const channel   = currentParams.get("channel")      || "Direct";
-      const action    = currentParams.get("action")       || "";
+
+      // อ่าน liff.state ก่อน init
+      const liffState = currentParams.get("liff.state");
+      let kw = '', mt = '', cp = '', ch = 'Direct', ac = '';
+
+      if (liffState) {
+        try {
+          const stateParams = new URLSearchParams(decodeURIComponent(liffState));
+          kw = stateParams.get("kw") || '';
+          mt = stateParams.get("mt") || '';
+          cp = stateParams.get("cp") || '';
+          ch = stateParams.get("ch") || 'Direct';
+          ac = stateParams.get("ac") || '';
+        } catch(e) {}
+      }
+
+      // ถ้าไม่มีจาก liff.state ให้ดึงจาก URL params ปกติ
+      if (!kw) kw = currentParams.get("keyword")      || '';
+      if (!mt) mt = currentParams.get("matchtype")    || '';
+      if (!cp) cp = currentParams.get("utm_campaign") || '';
+      if (!ch) ch = currentParams.get("channel")      || 'Direct';
+      if (!ac) ac = currentParams.get("action")       || '';
 
       await liff.init({
         liffId: LIFF_ID,
@@ -113,43 +130,30 @@
       });
 
       if (!liff.isLoggedIn()) {
-        // เก็บ action ไว้ใน sessionStorage ก่อน redirect
-        sessionStorage.setItem('liff_action', action);
-        sessionStorage.setItem('liff_keyword', keyword);
-        sessionStorage.setItem('liff_matchtype', matchtype);
-        sessionStorage.setItem('liff_campaign', campaign);
-        sessionStorage.setItem('liff_channel', channel);
+        // เก็บไว้ใน sessionStorage ก่อน redirect
+        sessionStorage.setItem('liff_action',    ac);
+        sessionStorage.setItem('liff_keyword',   kw);
+        sessionStorage.setItem('liff_matchtype', mt);
+        sessionStorage.setItem('liff_campaign',  cp);
+        sessionStorage.setItem('liff_channel',   ch);
 
         const state = encodeURIComponent(
-          "kw=" + encodeURIComponent(keyword) +
-          "&mt=" + encodeURIComponent(matchtype) +
-          "&cp=" + encodeURIComponent(campaign) +
-          "&ch=" + encodeURIComponent(channel) +
-          "&ac=" + encodeURIComponent(action)
+          "kw=" + encodeURIComponent(kw) +
+          "&mt=" + encodeURIComponent(mt) +
+          "&cp=" + encodeURIComponent(cp) +
+          "&ch=" + encodeURIComponent(ch) +
+          "&ac=" + encodeURIComponent(ac)
         );
         liff.login({ redirectUri: window.location.origin + window.location.pathname + "?liff.state=" + state });
         return;
       }
 
-      let kw = keyword, mt = matchtype, cp = campaign, ch = channel, ac = action;
-      const liffState = currentParams.get("liff.state");
-      if (liffState) {
-        try {
-          const stateParams = new URLSearchParams(decodeURIComponent(liffState));
-          kw = stateParams.get("kw") || kw;
-          mt = stateParams.get("mt") || mt;
-          cp = stateParams.get("cp") || cp;
-          ch = stateParams.get("ch") || ch;
-          ac = stateParams.get("ac") || ac;
-        } catch(e) {}
-      }
-
-      // ถ้ายังไม่มี ac ให้ดึงจาก sessionStorage
-      if (!ac) ac = sessionStorage.getItem('liff_action') || '';
-      if (!kw) kw = sessionStorage.getItem('liff_keyword') || '';
+      // ถ้ายังไม่มีค่า ให้ดึงจาก sessionStorage
+      if (!ac) ac = sessionStorage.getItem('liff_action')    || '';
+      if (!kw) kw = sessionStorage.getItem('liff_keyword')   || '';
       if (!mt) mt = sessionStorage.getItem('liff_matchtype') || '';
-      if (!cp) cp = sessionStorage.getItem('liff_campaign') || '';
-      if (!ch) ch = sessionStorage.getItem('liff_channel') || 'Direct';
+      if (!cp) cp = sessionStorage.getItem('liff_campaign')  || '';
+      if (!ch) ch = sessionStorage.getItem('liff_channel')   || 'Direct';
 
       // ล้าง sessionStorage
       sessionStorage.removeItem('liff_action');
