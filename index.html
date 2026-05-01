@@ -87,66 +87,51 @@
       const liffState = currentParams.get("liff.state");
       
       let kw = '', mt = '', cp = '', ch = '', ac = '', gclid = '';
-      let source = 'unknown';
 
-      // 1) อ่านจาก liff.state ก่อน (กรณี redirect กลับมาจาก LINE login)
+      // 1) อ่านจาก liff.state ก่อน (รองรับทั้ง full key และ short key)
       if (liffState) {
         try {
-          const stateParams = new URLSearchParams(decodeURIComponent(liffState));
-          kw = stateParams.get("kw") || '';
-          mt = stateParams.get("mt") || '';
-          cp = stateParams.get("cp") || '';
-          ch = stateParams.get("ch") || '';
-          ac = stateParams.get("ac") || '';
-          gclid = stateParams.get("gc") || '';
-          source = 'liff.state';
+          let stateString = decodeURIComponent(liffState);
+          // 🔧 FIX: lop "?" ออกถ้ามี (LINE บางครั้งใส่อัตโนมัติ)
+          if (stateString.startsWith('?')) {
+            stateString = stateString.substring(1);
+          }
+          
+          const stateParams = new URLSearchParams(stateString);
+          // รองรับทั้ง full key และ short key
+          kw = stateParams.get("keyword") || stateParams.get("kw") || '';
+          mt = stateParams.get("matchtype") || stateParams.get("mt") || '';
+          cp = stateParams.get("utm_campaign") || stateParams.get("cp") || '';
+          ch = stateParams.get("channel") || stateParams.get("ch") || '';
+          ac = stateParams.get("action") || stateParams.get("ac") || '';
+          gclid = stateParams.get("gclid") || stateParams.get("gc") || '';
         } catch(e) {}
       }
 
-      // 2) อ่านจาก URL ปัจจุบัน (กรณีเข้ามาตรงๆ ไม่ผ่าน login)
-      if (!ch && currentParams.get("channel")) {
-        kw = currentParams.get("keyword") || '';
-        mt = currentParams.get("matchtype") || '';
-        cp = currentParams.get("utm_campaign") || '';
-        ch = currentParams.get("channel") || '';
-        ac = currentParams.get("action") || '';
-        gclid = currentParams.get("gclid") || '';
-        source = 'URL params';
-      }
+      // 2) อ่านจาก URL ปัจจุบัน
+      if (!ch) ch = currentParams.get("channel") || '';
+      if (!kw) kw = currentParams.get("keyword") || '';
+      if (!mt) mt = currentParams.get("matchtype") || '';
+      if (!cp) cp = currentParams.get("utm_campaign") || '';
+      if (!ac) ac = currentParams.get("action") || '';
+      if (!gclid) gclid = currentParams.get("gclid") || '';
 
-      // 3) ถ้ายังไม่ได้ → ลอง sessionStorage (กรณีกลับมาจาก login แต่ไม่มี state)
+      // 3) Fallback ไป sessionStorage
       if (!ch) {
-        const stored_ch = sessionStorage.getItem('liff_channel');
-        if (stored_ch) {
-          ac = sessionStorage.getItem('liff_action') || '';
-          kw = sessionStorage.getItem('liff_keyword') || '';
-          mt = sessionStorage.getItem('liff_matchtype') || '';
-          cp = sessionStorage.getItem('liff_campaign') || '';
-          ch = stored_ch;
-          gclid = sessionStorage.getItem('liff_gclid') || '';
-          source = 'sessionStorage';
-        }
+        ac = ac || sessionStorage.getItem('liff_action') || '';
+        kw = kw || sessionStorage.getItem('liff_keyword') || '';
+        mt = mt || sessionStorage.getItem('liff_matchtype') || '';
+        cp = cp || sessionStorage.getItem('liff_campaign') || '';
+        ch = sessionStorage.getItem('liff_channel') || '';
+        gclid = gclid || sessionStorage.getItem('liff_gclid') || '';
       }
-
-      // 🔍 DEBUG ALERT - ลบออกหลัง debug เสร็จ
-      alert(
-        '🔍 LIFF Bridge Debug\n\n' +
-        '📦 ค่าที่อ่านได้:\n' +
-        '- channel: "' + ch + '"\n' +
-        '- gclid: "' + (gclid ? gclid.substring(0, 20) + '...' : '') + '"\n' +
-        '- keyword: "' + kw + '"\n' +
-        '- action: "' + ac + '"\n\n' +
-        '🔗 ที่มา: ' + source + '\n\n' +
-        '📍 URL: ' + window.location.href.substring(0, 150) + '...\n\n' +
-        '🔐 liff.state: ' + (liffState ? 'มี' : 'ไม่มี')
-      );
 
       await liff.init({
         liffId: LIFF_ID,
         withLoginOnExternalBrowser: true
       });
 
-      // 4) ถ้ายังไม่ได้ login → save แล้ว redirect ไป login
+      // 4) ถ้ายังไม่ login → save แล้ว redirect ไป login
       if (!liff.isLoggedIn()) {
         sessionStorage.setItem('liff_action', ac);
         sessionStorage.setItem('liff_keyword', kw);
@@ -155,16 +140,8 @@
         sessionStorage.setItem('liff_channel', ch);
         sessionStorage.setItem('liff_gclid', gclid);
 
-        const state = encodeURIComponent(
-          "kw=" + encodeURIComponent(kw) +
-          "&mt=" + encodeURIComponent(mt) +
-          "&cp=" + encodeURIComponent(cp) +
-          "&ch=" + encodeURIComponent(ch) +
-          "&ac=" + encodeURIComponent(ac) +
-          "&gc=" + encodeURIComponent(gclid)
-        );
         liff.login({ 
-          redirectUri: window.location.origin + window.location.pathname + "?liff.state=" + state 
+          redirectUri: window.location.href
         });
         return;
       }
@@ -177,7 +154,19 @@
       sessionStorage.removeItem('liff_channel');
       sessionStorage.removeItem('liff_gclid');
 
-      // 6) ส่งข้อมูลไป webhook
+      // 6) ตรวจสอบ — ถ้าทุกค่าว่าง ไม่ส่ง webhook (กัน duplicate)
+      if (!ch && !kw && !ac) {
+        console.log('No data to send, skipping webhook');
+        // ยังคง redirect ไป LINE OA
+        if (liff.isInClient()) {
+          liff.openWindow({ url: "https://line.me/R/ti/p/@clubtrue", external: false });
+        } else {
+          window.location.href = "https://line.me/R/ti/p/@clubtrue";
+        }
+        return;
+      }
+
+      // 7) ส่งข้อมูลไป webhook
       const profile = await liff.getProfile();
       const device = /Mobi|Android/i.test(navigator.userAgent) ? "มือถือ" : "คอมพิวเตอร์";
       const timestamp = new Date().toLocaleString("th-TH", { timeZone: "Asia/Bangkok" });
@@ -209,7 +198,7 @@
         console.error("Webhook error:", e);
       }
 
-      // 7) Redirect ไป LINE OA
+      // 8) Redirect ไป LINE OA
       if (liff.isInClient()) {
         liff.openWindow({
           url: "https://line.me/R/ti/p/@clubtrue",
@@ -222,7 +211,6 @@
 
     main().catch(function(err) {
       console.error(err);
-      alert('❌ Error: ' + err.message);
     });
   </script>
 </body>
