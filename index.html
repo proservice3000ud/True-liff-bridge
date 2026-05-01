@@ -114,7 +114,9 @@
           cp = stateParams.get("cp") || '';
           ch = stateParams.get("ch") || 'Direct';
           ac = stateParams.get("ac") || '';
-        } catch(e) {}
+        } catch(e) {
+          console.error("liffState parse error:", e);
+        }
       }
 
       // ถ้าไม่มีจาก liff.state ให้ดึงจาก URL params ปกติ
@@ -124,13 +126,18 @@
       if (!ch) ch = currentParams.get("channel")      || 'Direct';
       if (!ac) ac = currentParams.get("action")       || '';
 
+      // debug
+      console.log("=== LIFF Debug ===");
+      console.log("URL:", window.location.search);
+      console.log("liffState raw:", liffState);
+      console.log("values - kw:", kw, "ch:", ch, "ac:", ac, "cp:", cp);
+
       await liff.init({
         liffId: LIFF_ID,
         withLoginOnExternalBrowser: true
       });
 
       if (!liff.isLoggedIn()) {
-        // เก็บไว้ใน sessionStorage ก่อน redirect
         sessionStorage.setItem('liff_action',    ac);
         sessionStorage.setItem('liff_keyword',   kw);
         sessionStorage.setItem('liff_matchtype', mt);
@@ -155,6 +162,8 @@
       if (!cp) cp = sessionStorage.getItem('liff_campaign')  || '';
       if (!ch) ch = sessionStorage.getItem('liff_channel')   || 'Direct';
 
+      console.log("after sessionStorage - kw:", kw, "ch:", ch, "ac:", ac);
+
       // ล้าง sessionStorage
       sessionStorage.removeItem('liff_action');
       sessionStorage.removeItem('liff_keyword');
@@ -177,6 +186,8 @@
         timestamp:    timestamp,
         action:       ac
       };
+
+      console.log("sending data:", JSON.stringify(data));
 
       const blob = new Blob([JSON.stringify(data)], { type: "application/json" });
       navigator.sendBeacon(WEBHOOK_URL, blob);
