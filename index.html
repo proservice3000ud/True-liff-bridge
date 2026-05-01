@@ -179,12 +179,15 @@
         action:       ac
       };
 
+      // ส่งด้วย sendBeacon ก่อน
       const blob = new Blob([JSON.stringify(data)], { type: "application/json" });
       navigator.sendBeacon(WEBHOOK_URL, blob);
 
+      // ส่งสำรองด้วย fetch + no-cors
       try {
         await fetch(WEBHOOK_URL, {
           method: "POST",
+          mode: "no-cors",
           headers: { "Content-Type": "application/json" },
           keepalive: true,
           body: JSON.stringify(data)
