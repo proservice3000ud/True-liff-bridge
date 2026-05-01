@@ -104,7 +104,7 @@
 
       // อ่าน liff.state ก่อน init
       const liffState = currentParams.get("liff.state");
-      let kw = '', mt = '', cp = '', ch = 'Direct', ac = '';
+      let kw = '', mt = '', cp = '', ch = '', ac = '';
 
       if (liffState) {
         try {
@@ -112,7 +112,7 @@
           kw = stateParams.get("kw") || '';
           mt = stateParams.get("mt") || '';
           cp = stateParams.get("cp") || '';
-          ch = stateParams.get("ch") || 'Direct';
+          ch = stateParams.get("ch") || '';
           ac = stateParams.get("ac") || '';
         } catch(e) {
           console.error("liffState parse error:", e);
@@ -123,14 +123,8 @@
       if (!kw) kw = currentParams.get("keyword")      || '';
       if (!mt) mt = currentParams.get("matchtype")    || '';
       if (!cp) cp = currentParams.get("utm_campaign") || '';
-      if (!ch) ch = currentParams.get("channel")      || 'Direct';
+      if (!ch) ch = currentParams.get("channel")      || '';
       if (!ac) ac = currentParams.get("action")       || '';
-
-      // debug
-      console.log("=== LIFF Debug ===");
-      console.log("URL:", window.location.search);
-      console.log("liffState raw:", liffState);
-      console.log("values - kw:", kw, "ch:", ch, "ac:", ac, "cp:", cp);
 
       await liff.init({
         liffId: LIFF_ID,
@@ -160,9 +154,7 @@
       if (!kw) kw = sessionStorage.getItem('liff_keyword')   || '';
       if (!mt) mt = sessionStorage.getItem('liff_matchtype') || '';
       if (!cp) cp = sessionStorage.getItem('liff_campaign')  || '';
-      if (!ch) ch = sessionStorage.getItem('liff_channel')   || 'Direct';
-
-      console.log("after sessionStorage - kw:", kw, "ch:", ch, "ac:", ac);
+      if (!ch) ch = sessionStorage.getItem('liff_channel')   || '';
 
       // ล้าง sessionStorage
       sessionStorage.removeItem('liff_action');
@@ -180,14 +172,12 @@
         displayName:  profile.displayName,
         keyword:      kw || "(not provided)",
         matchtype:    mt,
-        utm_source:   ch,
+        utm_source:   ch || 'Direct',
         utm_campaign: cp,
         device:       device,
         timestamp:    timestamp,
         action:       ac
       };
-
-      console.log("sending data:", JSON.stringify(data));
 
       const blob = new Blob([JSON.stringify(data)], { type: "application/json" });
       navigator.sendBeacon(WEBHOOK_URL, blob);
