@@ -82,12 +82,41 @@
     const LIFF_ID = "2009932145-FwlmUmzy";
     const WEBHOOK_URL = "https://n8nb.workproservice.org/webhook/true-liff";
 
+    // localStorage helpers (cross-redirect persistence)
+    function saveParams(data) {
+      try {
+        localStorage.setItem('true_liff_params', JSON.stringify({
+          ...data,
+          _ts: Date.now()
+        }));
+      } catch(e) {}
+    }
+    
+    function loadParams() {
+      try {
+        const raw = localStorage.getItem('true_liff_params');
+        if (!raw) return null;
+        const data = JSON.parse(raw);
+        // ใช้ได้ใน 10 นาที
+        if (Date.now() - data._ts > 10 * 60 * 1000) {
+          localStorage.removeItem('true_liff_params');
+          return null;
+        }
+        return data;
+      } catch(e) { return null; }
+    }
+    
+    function clearParams() {
+      try { localStorage.removeItem('true_liff_params'); } catch(e) {}
+    }
+
     async function main() {
       const currentParams = new URLSearchParams(window.location.search);
 
       const liffState = currentParams.get("liff.state");
-      let kw = '', mt = '', cp = '', ch = '', ac = '';
+      let kw = '', mt = '', cp = '', ch = '', ac = '', gclid = '';
 
+      // 1) อ่านจาก liff.state (ถ้ามี)
       if (liffState) {
         try {
           const stateParams = new URLSearchParams(decodeURIComponent(liffState));
@@ -96,62 +125,79 @@
           cp = stateParams.get("cp") || '';
           ch = stateParams.get("ch") || '';
           ac = stateParams.get("ac") || '';
+          gclid = stateParams.get("gc") || '';
         } catch(e) {}
       }
 
+      // 2) อ่านจาก URL ปัจจุบัน
       if (!kw) kw = currentParams.get("keyword")      || '';
       if (!mt) mt = currentParams.get("matchtype")    || '';
       if (!cp) cp = currentParams.get("utm_campaign") || '';
       if (!ch) ch = currentParams.get("channel")      || '';
       if (!ac) ac = currentParams.get("action")       || '';
+      if (!gclid) gclid = currentParams.get("gclid")  || '';
+
+      // 3) ถ้ามีค่ามาจาก URL → save ลง localStorage ทันที (กันหายตอน redirect)
+      if (kw || mt || cp || ch || ac || gclid) {
+        saveParams({ kw, mt, cp, ch, ac, gclid });
+      }
 
       await liff.init({
         liffId: LIFF_ID,
         withLoginOnExternalBrowser: true
       });
 
+      // 4) ถ้ายังไม่ login → save แล้ว redirect ไป login
       if (!liff.isLoggedIn()) {
-        const loginAttempt = sessionStorage.getItem('liff_login_attempt');
-        if (loginAttempt) {
-          // login แล้วแต่ยังไม่ได้ state → ดึงจาก sessionStorage แล้วดำเนินการต่อ
-          sessionStorage.removeItem('liff_login_attempt');
-          ac = sessionStorage.getItem('liff_action')    || ac;
-          kw = sessionStorage.getItem('liff_keyword')   || kw;
-          mt = sessionStorage.getItem('liff_matchtype') || mt;
-          cp = sessionStorage.getItem('liff_campaign')  || cp;
-          ch = sessionStorage.getItem('liff_channel')   || ch;
-        } else {
-          sessionStorage.setItem('liff_login_attempt', '1');
-          sessionStorage.setItem('liff_action',    ac);
-          sessionStorage.setItem('liff_keyword',   kw);
-          sessionStorage.setItem('liff_matchtype', mt);
-          sessionStorage.setItem('liff_campaign',  cp);
-          sessionStorage.setItem('liff_channel',   ch);
+        // เก็บลง sessionStorage + localStorage ก่อน
+        sessionStorage.setItem('liff_action',    ac);
+        sessionStorage.setItem('liff_keyword',   kw);
+        sessionStorage.setItem('liff_matchtype', mt);
+        sessionStorage.setItem('liff_campaign',  cp);
+        sessionStorage.setItem('liff_channel',   ch);
+        sessionStorage.setItem('liff_gclid',     gclid);
+        saveParams({ kw, mt, cp, ch, ac, gclid });
 
-          const state = encodeURIComponent(
-            "kw=" + encodeURIComponent(kw) +
-            "&mt=" + encodeURIComponent(mt) +
-            "&cp=" + encodeURIComponent(cp) +
-            "&ch=" + encodeURIComponent(ch) +
-            "&ac=" + encodeURIComponent(ac)
-          );
-          liff.login({ redirectUri: window.location.origin + window.location.pathname + "?liff.state=" + state });
-          return;
-        }
+        const state = encodeURIComponent(
+          "kw=" + encodeURIComponent(kw) +
+          "&mt=" + encodeURIComponent(mt) +
+          "&cp=" + encodeURIComponent(cp) +
+          "&ch=" + encodeURIComponent(ch) +
+          "&ac=" + encodeURIComponent(ac) +
+          "&gc=" + encodeURIComponent(gclid)
+        );
+        liff.login({ redirectUri: window.location.origin + window.location.pathname + "?liff.state=" + state });
+        return;
       }
 
-      if (!ac) ac = sessionStorage.getItem('liff_action')    || '';
-      if (!kw) kw = sessionStorage.getItem('liff_keyword')   || '';
-      if (!mt) mt = sessionStorage.getItem('liff_matchtype') || '';
-      if (!cp) cp = sessionStorage.getItem('liff_campaign')  || '';
-      if (!ch) ch = sessionStorage.getItem('liff_channel')   || '';
+      // 5) Login แล้ว → ถ้ายังไม่มี channel → ลองดึงจาก localStorage / sessionStorage
+      if (!ch || !kw || !ac) {
+        const stored = loadParams();
+        if (stored) {
+          if (!ac) ac = stored.ac || '';
+          if (!kw) kw = stored.kw || '';
+          if (!mt) mt = stored.mt || '';
+          if (!cp) cp = stored.cp || '';
+          if (!ch) ch = stored.ch || '';
+          if (!gclid) gclid = stored.gclid || '';
+        }
+        
+        if (!ac) ac = sessionStorage.getItem('liff_action')    || '';
+        if (!kw) kw = sessionStorage.getItem('liff_keyword')   || '';
+        if (!mt) mt = sessionStorage.getItem('liff_matchtype') || '';
+        if (!cp) cp = sessionStorage.getItem('liff_campaign')  || '';
+        if (!ch) ch = sessionStorage.getItem('liff_channel')   || '';
+        if (!gclid) gclid = sessionStorage.getItem('liff_gclid') || '';
+      }
 
-      sessionStorage.removeItem('liff_login_attempt');
+      // 6) ล้าง storage หลังใช้งาน
       sessionStorage.removeItem('liff_action');
       sessionStorage.removeItem('liff_keyword');
       sessionStorage.removeItem('liff_matchtype');
       sessionStorage.removeItem('liff_campaign');
       sessionStorage.removeItem('liff_channel');
+      sessionStorage.removeItem('liff_gclid');
+      clearParams();
 
       const profile   = await liff.getProfile();
       const device    = /Mobi|Android/i.test(navigator.userAgent) ? "มือถือ" : "คอมพิวเตอร์";
@@ -164,6 +210,7 @@
         matchtype:    mt,
         utm_source:   ch || 'Direct',
         utm_campaign: cp,
+        gclid:        gclid,
         device:       device,
         timestamp:    timestamp,
         action:       ac
